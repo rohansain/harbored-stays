@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+#Implemented a standardized API response structure using the Builder and Static Factory patterns, ensuring consistent, null-safe JSON responses across all endpoints.

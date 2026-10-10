@@ -1,5 +1,6 @@
 package com.rohan.harbored.controller;
 
+import com.rohan.harbored.dto.request.LoginRequestDto;
 import com.rohan.harbored.dto.request.SignupRequestDto;
 import com.rohan.harbored.dto.response.ApiResponse;
 import com.rohan.harbored.dto.response.UserResponseDto;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.harbored.dto.response.AuthResponseDto;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,5 +28,12 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(createdUser, "User registered successfully"));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponseDto>> login(@Valid @RequestBody LoginRequestDto request) {
+        AuthResponseDto authResponse = authService.login(request);
+        return ResponseEntity
+                .ok(ApiResponse.success(authResponse, "Authentication successful"));
     }
 }

@@ -1,5 +1,6 @@
 package com.rohan.harbored.controller;
 
+import com.rohan.harbored.dto.request.ForgotPasswordRequestDto;
 import com.rohan.harbored.dto.request.LoginRequestDto;
 import com.rohan.harbored.dto.request.SignupRequestDto;
 import com.rohan.harbored.dto.response.ApiResponse;
@@ -35,5 +36,14 @@ public class AuthController {
         AuthResponseDto authResponse = authService.login(request);
         return ResponseEntity
                 .ok(ApiResponse.success(authResponse, "Authentication successful"));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDto request) {
+        authService.initiatePasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                null,
+                "If an account exists with this email, an OTP has been sent."
+        ));
     }
 }

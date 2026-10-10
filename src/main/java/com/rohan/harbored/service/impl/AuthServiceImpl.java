@@ -1,5 +1,6 @@
 package com.rohan.harbored.service.impl;
 
+import com.rohan.harbored.dto.request.ForgotPasswordRequestDto;
 import com.rohan.harbored.dto.request.LoginRequestDto;
 import com.rohan.harbored.dto.request.SignupRequestDto;
 import com.rohan.harbored.dto.response.UserResponseDto;
@@ -12,7 +13,10 @@ import com.rohan.harbored.repository.UserRepository;
 import com.rohan.harbored.security.CustomUserDetails;
 import com.rohan.harbored.security.JwtUtil;
 import com.rohan.harbored.service.AuthService;
+import com.rohan.harbored.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,16 +26,26 @@ import org.springframework.transaction.annotation.Transactional;
 import com.harbored.dto.response.AuthResponseDto;
 
 import java.net.Authenticator;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+import java.util.logging.Logger;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -94,5 +108,28 @@ public class AuthServiceImpl implements AuthService {
                 .tokenType("Bearer")
                 .user(userMapper.toResponseDto(user))
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void initiatePasswordReset(ForgotPasswordRequestDto request) {
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+        Optional<User> userOptional = userRepository.findByEmail(normalizedEmail);
+
+        if (userOptional.isEmpty()) {
+            log.warn("Password reset requested for non-existent email: {}", normalizedEmail);
+            return;
+        }
+
+        User user = userOptional.get();
+
+        String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        Instant expiryTime = Instant.now().plus(10, ChronoUnit.MINUTES);
+
+        user.setResetOtpCode(otp);
+        user.setResetOtpExpiry(expiryTime);
+        userRepository.save(user);
+
+        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 }

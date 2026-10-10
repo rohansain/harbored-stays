@@ -20,7 +20,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/signup").permitAll()
+//                        .requestMatchers("/api/v1/auth/signup","/api/v1/health").permitAll()
+                        // Option B: Permit all endpoints across the entire app for local testing
+                        .anyRequest().permitAll()
                 );
 
         return http.build();

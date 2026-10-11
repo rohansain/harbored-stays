@@ -55,6 +55,9 @@ public class User {
     @Column(name = "verification_doc_type", length = 30)
     private VerificationDocType verificationDocType;
 
+    @Column(name = "verification_doc_url", length = 500)
+    private String verificationDocUrl;
+
     @Column(name = "reset_otp_code", length = 10)
     private String resetOtpCode;
 

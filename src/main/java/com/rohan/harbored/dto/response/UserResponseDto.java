@@ -22,5 +22,6 @@ public class UserResponseDto {
     private Role role;
     private VerificationStatus verificationStatus;
     private VerificationDocType verificationDocType;
+    private String verificationDocUrl;
     private Instant createdAt;
 }

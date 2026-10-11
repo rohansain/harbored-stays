@@ -19,6 +19,7 @@ public class UserMapper {
                 .role(user.getRole())
                 .verificationStatus(user.getVerificationStatus())
                 .verificationDocType(user.getVerificationDocType())
+                .verificationDocUrl(user.getVerificationDocUrl())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

@@ -1,9 +1,8 @@
 package com.rohan.harbored.controller;
 
-import com.rohan.harbored.dto.request.ForgotPasswordRequestDto;
-import com.rohan.harbored.dto.request.LoginRequestDto;
-import com.rohan.harbored.dto.request.SignupRequestDto;
+import com.rohan.harbored.dto.request.*;
 import com.rohan.harbored.dto.response.ApiResponse;
+import com.rohan.harbored.dto.response.AuthResponseDto;
 import com.rohan.harbored.dto.response.UserResponseDto;
 import com.rohan.harbored.service.AuthService;
 import jakarta.validation.Valid;
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.harbored.dto.response.AuthResponseDto;
+import com.rohan.harbored.dto.response.AuthResponseDto;
 
 @RestController
 @RequiredArgsConstructor
@@ -45,5 +44,17 @@ public class AuthController {
                 null,
                 "If an account exists with this email, an OTP has been sent."
         ));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<Void>> verifyOtp(@Valid @RequestBody VerifyOtpRequestDto request) {
+        authService.verifyOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "OTP verified successfully."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password has been successfully reset."));
     }
 }

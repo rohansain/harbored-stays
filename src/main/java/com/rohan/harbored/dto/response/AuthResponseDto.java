@@ -1,4 +1,4 @@
-package com.harbored.dto.response;
+package com.rohan.harbored.dto.response;
 
 import com.rohan.harbored.dto.response.UserResponseDto;
 import lombok.AllArgsConstructor;

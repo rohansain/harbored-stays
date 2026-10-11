@@ -1,8 +1,7 @@
 package com.rohan.harbored.service.impl;
 
-import com.rohan.harbored.dto.request.ForgotPasswordRequestDto;
-import com.rohan.harbored.dto.request.LoginRequestDto;
-import com.rohan.harbored.dto.request.SignupRequestDto;
+import com.rohan.harbored.dto.request.*;
+import com.rohan.harbored.dto.response.AuthResponseDto;
 import com.rohan.harbored.dto.response.UserResponseDto;
 import com.rohan.harbored.entity.User;
 import com.rohan.harbored.entity.enums.VerificationStatus;
@@ -12,6 +11,7 @@ import com.rohan.harbored.mapper.UserMapper;
 import com.rohan.harbored.repository.UserRepository;
 import com.rohan.harbored.security.CustomUserDetails;
 import com.rohan.harbored.security.JwtUtil;
+import com.rohan.harbored.security.OtpRateLimiter;
 import com.rohan.harbored.service.AuthService;
 import com.rohan.harbored.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.harbored.dto.response.AuthResponseDto;
+import com.rohan.harbored.dto.response.AuthResponseDto;
 
 import java.net.Authenticator;
 import java.security.SecureRandom;
@@ -46,6 +46,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final OtpRateLimiter otpRateLimiter;
+
 
     @Override
     @Transactional
@@ -131,5 +133,56 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
         emailService.sendOtpEmail(user.getEmail(), otp);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void verifyOtp(VerifyOtpRequestDto request) {
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+        if (!otpRateLimiter.isAllowed(normalizedEmail)) {
+            throw new BadRequestException("Too many verification attempts. Please request a new OTP.");
+        }
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new BadRequestException("Invalid or expired OTP"));
+
+        validateOtpDetails(user, request.getOtp());
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequestDto request) {
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+        if (!otpRateLimiter.isAllowed(normalizedEmail)) {
+            throw new BadRequestException("Too many verification attempts. Please request a new OTP.");
+        }
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new BadRequestException("Invalid or expired OTP"));
+
+        validateOtpDetails(user, request.getOtp());
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setResetOtpCode(null);
+        user.setResetOtpExpiry(null);
+
+        userRepository.save(user);
+        otpRateLimiter.clear(normalizedEmail);
+    }
+
+    private void validateOtpDetails(User user, String providedOtp) {
+        if (user.getResetOtpCode() == null || user.getResetOtpExpiry() == null) {
+            throw new BadRequestException("No active OTP request found for this account");
+        }
+
+        if (Instant.now().isAfter(user.getResetOtpExpiry())) {
+            throw new BadRequestException("OTP has expired. Please request a new one.");
+        }
+
+        if (!user.getResetOtpCode().equals(providedOtp)) {
+            throw new BadRequestException("Invalid OTP provided");
+        }
     }
 }

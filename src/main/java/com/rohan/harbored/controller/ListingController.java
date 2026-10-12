@@ -8,6 +8,7 @@ import com.rohan.harbored.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,7 +20,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -73,5 +76,16 @@ public class ListingController {
     ) {
         listingService.deleteListing(id, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success(null, "Listing deleted successfully"));
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('HOST') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ListingResponseDto>> uploadListingImages(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("files") List<MultipartFile> files
+    ) {
+        ListingResponseDto updatedListing = listingService.uploadListingImages(id, userDetails.getUsername(), files);
+        return ResponseEntity.ok(ApiResponse.success(updatedListing, "Listing images uploaded successfully"));
     }
 }

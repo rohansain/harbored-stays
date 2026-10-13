@@ -38,7 +38,7 @@ class ListingRepositoryTest {
         User savedHost = userRepository.save(host);
 
         Listing listing = Listing.builder()
-                .title("Cozy Studio near Tech Park")
+                .title("2BHK Furnished Flat near Embassy TechVillage")
                 .description("Fully furnished studio with high-speed internet for interns.")
                 .location("Whitefield")
                 .city("Bengaluru")
@@ -56,7 +56,7 @@ class ListingRepositoryTest {
 
         List<Listing> listingsInCity = listingRepository.findByCityIgnoreCase("bengaluru");
         assertThat(listingsInCity).isNotEmpty();
-        assertThat(listingsInCity.get(0).getTitle()).isEqualTo("Cozy Studio near Tech Park");
-        assertThat(listingsInCity.get(0).getOwner().getEmail()).isEqualTo("host.verified@harbored.com");
+        assertThat(listingsInCity.get(0).getTitle()).isEqualTo("2BHK Furnished Flat near Embassy TechVillage");
+        assertThat(listingsInCity.get(0).getOwner().getEmail()).isEqualTo("rohansain.mca@gmail.com");
     }
 }

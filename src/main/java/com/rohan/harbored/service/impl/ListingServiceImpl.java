@@ -13,10 +13,12 @@ import com.rohan.harbored.exception.UnauthorizedException;
 import com.rohan.harbored.mapper.ListingMapper;
 import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.UserRepository;
+import com.rohan.harbored.service.DocumentStorageService;
 import com.rohan.harbored.service.ListingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,7 @@ public class ListingServiceImpl implements ListingService {
     private final ListingRepository listingRepository;
     private final UserRepository userRepository;
     private final ListingMapper listingMapper;
+    private final DocumentStorageService documentStorageService;
 
     @Override
     @Transactional
@@ -45,8 +48,6 @@ public class ListingServiceImpl implements ListingService {
 
         Listing listing = listingMapper.toEntity(request, user);
         Listing savedListing = listingRepository.save(listing);
-        System.out.println(listing);
-
         return listingMapper.toResponseDto(savedListing);
     }
 
@@ -117,6 +118,28 @@ public class ListingServiceImpl implements ListingService {
         validateOwnershipOrAdmin(listing, currentUser);
 
         listingRepository.delete(listing);
+    }
+
+    @Override
+    @Transactional
+    public ListingResponseDto uploadListingImages(Long listingId, String userEmail, List<MultipartFile> files) {
+        User currentUser = getUserByEmail(userEmail);
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Listing not found with id: " + listingId));
+
+        validateOwnershipOrAdmin(listing, currentUser);
+
+        List<String> uploadedUrls = documentStorageService.uploadListingImages(files, listing.getId());
+
+        List<String> existingImages = listing.getImages();
+        if (existingImages == null) {
+            existingImages = new ArrayList<>();
+        }
+        existingImages.addAll(uploadedUrls);
+        listing.setImages(existingImages);
+
+        Listing savedListing = listingRepository.save(listing);
+        return listingMapper.toResponseDto(savedListing);
     }
 
     private User getUserByEmail(String email) {

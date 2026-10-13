@@ -30,7 +30,7 @@ class ListingRepositoryTest {
     void shouldSaveAndFetchListingByCity() {
         User host = User.builder()
                 .name("Super Host")
-                .email("host.verified@harbored.com")
+                .email("rohansain.mca@gmail.com")
                 .passwordHash("hashed_secret_code")
                 .role(Role.HOST)
                 .verificationStatus(VerificationStatus.VERIFIED)

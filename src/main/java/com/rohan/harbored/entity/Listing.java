@@ -1,5 +1,6 @@
 package com.rohan.harbored.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -10,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,7 +50,7 @@ public class Listing {
     @Column(nullable = false, length = 100)
     private String city;
 
-    @Column(name = "price_per_month", nullable = false, precision = 10, scale = 2)
+    @Column(name = "price_per_month", nullable = false, precision = 10)
     private BigDecimal pricePerMonth;
 
     @Column(name = "min_stay_months", nullable = false)
@@ -67,7 +69,11 @@ public class Listing {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    @Column(name = "average_rating")
+    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Review> reviews = new ArrayList<>();
+
+    @Column(name = "average_rating", precision = 3)
     @Builder.Default
     private Double averageRating = 0.0;
 

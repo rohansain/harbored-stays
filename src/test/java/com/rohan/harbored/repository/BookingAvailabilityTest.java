@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 @DataJpaTest
 @Transactional
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -37,32 +38,34 @@ class BookingAvailabilityTest {
     private TestEntityManager entityManager;
 
     private Listing activeListing;
+    private User persistentGuest;
 
     @BeforeEach
     void setUp() {
-        // Clear tables in reverse dependency order to prevent duplicate key collisions
         bookingRepository.deleteAll();
         listingRepository.deleteAll();
         userRepository.deleteAll();
         entityManager.flush();
 
+        long uniqueSuffix = System.currentTimeMillis();
+
         User host = User.builder()
                 .name("Kavya Host")
-                .email("kavya.host@harbored.com")
+                .email("kavya.host_" + uniqueSuffix + "@harbored.com")
                 .passwordHash("encoded_bcrypt")
                 .role(Role.HOST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
         userRepository.save(host);
 
-        User guest = User.builder()
+        persistentGuest = User.builder()
                 .name("Arjun Guest")
-                .email("arjun.guest@harbored.com")
+                .email("arjun.guest_" + uniqueSuffix + "@harbored.com")
                 .passwordHash("encoded_bcrypt")
                 .role(Role.GUEST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
-        userRepository.save(guest);
+        userRepository.save(persistentGuest);
 
         activeListing = Listing.builder()
                 .title("Furnished 1BHK near Cyber City")
@@ -79,7 +82,7 @@ class BookingAvailabilityTest {
         // Seed an existing confirmed reservation from July 1, 2026 to September 1, 2026 (2 months)
         Booking confirmedBooking = Booking.builder()
                 .listing(activeListing)
-                .guest(guest)
+                .guest(persistentGuest)
                 .startDate(LocalDate.of(2026, 7, 1))
                 .endDate(LocalDate.of(2026, 9, 1))
                 .totalPrice(new BigDecimal("42000.00"))
@@ -176,11 +179,9 @@ class BookingAvailabilityTest {
     @Test
     @DisplayName("Case 8: Ignored Status (Overlaps with CANCELLED booking) - Should NOT conflict")
     void shouldIgnoreCancelledBookings() {
-        User guest = userRepository.findByEmail("arjun.guest@harbored.com").orElseThrow();
-
         Booking cancelledBooking = Booking.builder()
                 .listing(activeListing)
-                .guest(guest)
+                .guest(persistentGuest)
                 .startDate(LocalDate.of(2026, 11, 1))
                 .endDate(LocalDate.of(2026, 12, 1))
                 .totalPrice(new BigDecimal("21000.00"))

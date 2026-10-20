@@ -19,6 +19,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByListingIdAndStatus(Long listingId, BookingStatus status);
 
+    @Query("SELECT b FROM Booking b WHERE b.listing.owner.id = :hostId AND b.status = :status ORDER BY b.createdAt DESC")
+    List<Booking> findByHostIdAndStatus(@Param("hostId") Long hostId, @Param("status") BookingStatus status);
+
     @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END FROM Booking b " +
             "WHERE b.listing.id = :listingId " +
             "AND b.status = :status " +

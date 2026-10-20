@@ -1,6 +1,7 @@
 package com.rohan.harbored.service.impl;
 
 import com.rohan.harbored.dto.request.CreateBookingDto;
+import com.rohan.harbored.dto.request.RejectBookingRequestDto;
 import com.rohan.harbored.dto.response.BookingResponseDto;
 import com.rohan.harbored.entity.Booking;
 import com.rohan.harbored.entity.Listing;
@@ -18,6 +19,8 @@ import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.UserRepository;
 import com.rohan.harbored.service.BookingService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
     private static final BigDecimal DAYS_PER_MONTH = BigDecimal.valueOf(30);
 
     private final BookingRepository bookingRepository;
@@ -42,8 +46,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponseDto createBooking(String guestEmail, CreateBookingDto request) {
-        User guest = userRepository.findByEmail(guestEmail.toLowerCase().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + guestEmail));
+        User guest = getUserByEmail(guestEmail);
 
         if (guest.getVerificationStatus() != VerificationStatus.VERIFIED) {
             throw new BadRequestException("Only verified users can create bookings. Current status: " + guest.getVerificationStatus());
@@ -79,7 +82,6 @@ public class BookingServiceImpl implements BookingService {
             throw new BadRequestException("Stay duration (" + stayDays + " days) exceeds listing maximum stay requirement (" + maxDaysAllowed + " days)");
         }
 
-        // 1. Guard against duplicate pending requests by the same guest
         boolean hasExistingPending = bookingRepository.existsOverlappingBookingForGuest(
                 listing.getId(),
                 guest.getId(),
@@ -92,7 +94,6 @@ public class BookingServiceImpl implements BookingService {
             throw new BookingConflictException("You already have a pending booking request for these dates on this listing.");
         }
 
-        // 2. Guard against dates already locked by a confirmed booking
         boolean hasConfirmedOverlap = bookingRepository.existsOverlappingBooking(
                 listing.getId(),
                 BookingStatus.CONFIRMED,
@@ -123,8 +124,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public BookingResponseDto getBookingById(Long bookingId, String userEmail) {
-        User currentUser = userRepository.findByEmail(userEmail.toLowerCase().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+        User currentUser = getUserByEmail(userEmail);
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + bookingId));
@@ -143,11 +143,87 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public List<BookingResponseDto> getMyBookings(String guestEmail) {
-        User guest = userRepository.findByEmail(guestEmail.toLowerCase().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + guestEmail));
+        User guest = getUserByEmail(guestEmail);
 
-        return bookingRepository.findByGuestIdOrderByCreatedAtDesc(guest.getId()).stream()
+        return bookingRepository. findByGuestIdOrderByCreatedAtDesc(guest.getId()).stream()
                 .map(bookingMapper::toResponseDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingResponseDto> getHostPendingBookings(String hostEmail) {
+        User host = getUserByEmail(hostEmail);
+
+        return bookingRepository.findByHostIdAndStatus(host.getId(), BookingStatus.PENDING).stream()
+                .map(bookingMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto acceptBooking(Long bookingId, String hostEmail) {
+        User host = getUserByEmail(hostEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + bookingId));
+
+        validateHostOwnership(booking, host);
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BadRequestException("Only PENDING bookings can be accepted. Current status: " + booking.getStatus());
+        }
+
+        boolean hasConfirmedOverlap = bookingRepository.existsOverlappingBooking(
+                booking.getListing().getId(),
+                BookingStatus.CONFIRMED,
+                booking.getStartDate(),
+                booking.getEndDate()
+        );
+
+        if (hasConfirmedOverlap) {
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+            throw new BookingConflictException("Cannot accept booking: Dates have already been confirmed for another reservation.");
+        }
+
+        // Host approval acknowledges the request, remaining PENDING until payment confirmation (Day 25)
+        log.info("Host {} accepted booking request ID {}. Awaiting guest payment settlement.", host.getEmail(), booking.getId());
+        return bookingMapper.toResponseDto(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto rejectBooking(Long bookingId, String hostEmail, RejectBookingRequestDto request) {
+        User host = getUserByEmail(hostEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + bookingId));
+
+        validateHostOwnership(booking, host);
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BadRequestException("Only PENDING bookings can be rejected. Current status: " + booking.getStatus());
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        Booking cancelledBooking = bookingRepository.save(booking);
+
+        log.info("Host {} rejected booking ID {}. Reason: {}", host.getEmail(), booking.getId(),
+                request != null ? request.getReason() : "None provided");
+
+        return bookingMapper.toResponseDto(cancelledBooking);
+    }
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email.toLowerCase().trim())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    private void validateHostOwnership(Booking booking, User host) {
+        boolean isOwner = booking.getListing().getOwner().getId().equals(host.getId());
+        boolean isAdmin = host.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new UnauthorizedException("You are not authorized to manage bookings for this property");
+        }
     }
 }

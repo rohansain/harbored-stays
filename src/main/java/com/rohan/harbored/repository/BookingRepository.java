@@ -29,6 +29,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("status") BookingStatus status,
             @Param("requestedStartDate") LocalDate requestedStartDate,
             @Param("requestedEndDate") LocalDate requestedEndDate
+    );
 
+    @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END FROM Booking b " +
+            "WHERE b.listing.id = :listingId " +
+            "AND b.guest.id = :guestId " +
+            "AND b.status = :status " +
+            "AND b.startDate < :requestedEndDate " +
+            "AND b.endDate > :requestedStartDate")
+    boolean existsOverlappingBookingForGuest(
+            @Param("listingId") Long listingId,
+            @Param("guestId") Long guestId,
+            @Param("status") BookingStatus status,
+            @Param("requestedStartDate") LocalDate requestedStartDate,
+            @Param("requestedEndDate") LocalDate requestedEndDate
     );
 }

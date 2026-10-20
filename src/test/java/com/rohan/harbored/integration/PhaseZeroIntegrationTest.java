@@ -9,6 +9,7 @@ import com.rohan.harbored.dto.request.SignupRequestDto;
 import com.rohan.harbored.entity.User;
 import com.rohan.harbored.entity.enums.Role;
 import com.rohan.harbored.entity.enums.VerificationStatus;
+import com.rohan.harbored.repository.BookingRepository;
 import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.ReviewRepository;
 import com.rohan.harbored.repository.UserRepository;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -52,12 +52,16 @@ class PhaseZeroIntegrationTest {
     @Autowired
     private ReviewRepository reviewRepository;
 
-    @BeforeEach
-    void cleanDatabase() {
-        reviewRepository.deleteAll();
-        listingRepository.deleteAll();
-        userRepository.deleteAll();
-    }
+    @Autowired
+    private BookingRepository bookingRepository;
+
+//    @BeforeEach
+//    void cleanDatabase() {
+//        bookingRepository.deleteAll();
+//        reviewRepository.deleteAll();
+//        listingRepository.deleteAll();
+//        userRepository.deleteAll();
+//    }
 
     @Test
     @DisplayName("Complete Phase 0 E2E Lifecycle: Signup, Verify, Create Listing, Review, and Cascade Delete")

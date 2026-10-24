@@ -59,6 +59,10 @@ public class Booking {
     @Builder.Default
     private BookingStatus status = BookingStatus.PENDING;
 
+    @Column(name = "host_approved", nullable = false)
+    @Builder.Default
+    private Boolean hostApproved = false;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

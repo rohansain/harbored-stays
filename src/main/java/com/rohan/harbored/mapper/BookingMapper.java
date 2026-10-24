@@ -24,6 +24,7 @@ public class BookingMapper {
                 .endDate(booking.getEndDate())
                 .totalPrice(booking.getTotalPrice())
                 .status(booking.getStatus())
+                .hostApproved(booking.getHostApproved())
                 .version(booking.getVersion())
                 .createdAt(booking.getCreatedAt())
                 .build();

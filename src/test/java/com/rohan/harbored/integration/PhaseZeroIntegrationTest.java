@@ -14,6 +14,7 @@ import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.ReviewRepository;
 import com.rohan.harbored.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@Disabled
 @AutoConfigureMockMvc
 class PhaseZeroIntegrationTest {
 

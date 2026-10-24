@@ -27,6 +27,7 @@ public class BookingResponseDto {
     private LocalDate endDate;
     private BigDecimal totalPrice;
     private BookingStatus status;
+    private Boolean hostApproved;
     private Long version;
     private Instant createdAt;
 }

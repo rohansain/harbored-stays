@@ -115,6 +115,7 @@ public class BookingServiceImpl implements BookingService {
                 .endDate(endDate)
                 .totalPrice(totalPrice)
                 .status(BookingStatus.PENDING)
+                .hostApproved(false)
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);
@@ -145,7 +146,7 @@ public class BookingServiceImpl implements BookingService {
     public List<BookingResponseDto> getMyBookings(String guestEmail) {
         User guest = getUserByEmail(guestEmail);
 
-        return bookingRepository. findByGuestIdOrderByCreatedAtDesc(guest.getId()).stream()
+        return bookingRepository.findByGuestIdOrderByCreatedAtDesc(guest.getId()).stream()
                 .map(bookingMapper::toResponseDto)
                 .collect(Collectors.toList());
     }
@@ -182,13 +183,16 @@ public class BookingServiceImpl implements BookingService {
 
         if (hasConfirmedOverlap) {
             booking.setStatus(BookingStatus.CANCELLED);
+            booking.setHostApproved(false);
             bookingRepository.save(booking);
             throw new BookingConflictException("Cannot accept booking: Dates have already been confirmed for another reservation.");
         }
 
-        // Host approval acknowledges the request, remaining PENDING until payment confirmation (Day 25)
-        log.info("Host {} accepted booking request ID {}. Awaiting guest payment settlement.", host.getEmail(), booking.getId());
-        return bookingMapper.toResponseDto(booking);
+        booking.setHostApproved(true);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        log.info("Host {} accepted booking request ID {}. hostApproved set to true. Awaiting payment.", host.getEmail(), booking.getId());
+        return bookingMapper.toResponseDto(savedBooking);
     }
 
     @Override
@@ -205,6 +209,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
+        booking.setHostApproved(false);
         Booking cancelledBooking = bookingRepository.save(booking);
 
         log.info("Host {} rejected booking ID {}. Reason: {}", host.getEmail(), booking.getId(),

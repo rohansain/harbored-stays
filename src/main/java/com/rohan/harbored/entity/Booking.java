@@ -1,6 +1,7 @@
 package com.rohan.harbored.entity;
 
 import com.rohan.harbored.entity.enums.BookingStatus;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
@@ -23,6 +25,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "bookings")
@@ -62,6 +66,11 @@ public class Booking {
     @Column(name = "host_approved", nullable = false)
     @Builder.Default
     private Boolean hostApproved = false;
+
+    // Cascades deletes to associated payments and removes orphans
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
 
     @Version
     @Column(name = "version", nullable = false)

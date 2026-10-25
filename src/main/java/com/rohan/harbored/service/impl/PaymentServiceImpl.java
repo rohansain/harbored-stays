@@ -177,27 +177,39 @@ public class PaymentServiceImpl implements PaymentService {
 
             Booking booking = payment.getBooking();
 
-            // Idempotency check: if already processed, log and return early without mutating state
             if (payment.getStatus() == PaymentStatus.PAID && booking.getStatus() == BookingStatus.CONFIRMED) {
                 log.info("Webhook already processed for Order ID: {} and Booking ID: {}. Acknowledging idempotently.",
                         razorpayOrderId, booking.getId());
                 return;
             }
 
-            // Transition payment state
             payment.setRazorpayPaymentId(razorpayPaymentId);
             payment.setRazorpaySignature(signatureHeader);
             payment.setStatus(PaymentStatus.PAID);
             paymentRepository.save(payment);
 
-            // Transition booking state to officially lock calendar dates
             booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
 
             log.info("Order ID {} successfully captured. Payment ID {} updated to PAID, Booking ID {} updated to CONFIRMED.",
                     razorpayOrderId, payment.getId(), booking.getId());
+
+        } else if ("payment.failed".equals(eventType)) {
+            JSONObject payloadObj = eventJson.getJSONObject("payload");
+            JSONObject paymentObj = payloadObj.getJSONObject("payment").getJSONObject("entity");
+
+            String razorpayOrderId = paymentObj.optString("order_id");
+            String razorpayPaymentId = paymentObj.optString("id");
+
+            Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId).orElse(null);
+            if (payment != null) {
+                payment.setRazorpayPaymentId(razorpayPaymentId);
+                payment.setStatus(PaymentStatus.FAILED);
+                paymentRepository.save(payment);
+                log.warn("Payment failed on gateway for Order ID: {}. Marked Payment status as FAILED.", razorpayOrderId);
+            }
         } else {
-            log.debug("Ignoring non-settlement Razorpay event: {}", eventType);
+            log.debug("Ignoring unhandled Razorpay event: {}", eventType);
         }
     }
 }

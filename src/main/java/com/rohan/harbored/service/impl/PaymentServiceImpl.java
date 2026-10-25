@@ -3,6 +3,7 @@ package com.rohan.harbored.service.impl;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
+import com.razorpay.Utils;
 import com.rohan.harbored.dto.request.CreatePaymentOrderRequestDto;
 import com.rohan.harbored.dto.response.PaymentOrderResponseDto;
 import com.rohan.harbored.entity.Booking;
@@ -44,6 +45,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${razorpay.key.id}")
     private String razorpayKeyId;
 
+    @Value("${razorpay.webhook.secret}")
+    private String razorpayWebhookSecret;
+
     @Override
     @Transactional
     public PaymentOrderResponseDto createOrder(String guestEmail, CreatePaymentOrderRequestDto request) {
@@ -53,24 +57,20 @@ public class PaymentServiceImpl implements PaymentService {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + request.getBookingId()));
 
-        // 1. Authorize: only the booking's guest or an ADMIN can pay for it
         boolean isGuest = booking.getGuest().getId().equals(currentUser.getId());
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
         if (!isGuest && !isAdmin) {
             throw new UnauthorizedException("You are not authorized to create a payment order for this booking");
         }
 
-        // 2. Validate booking status
         if (booking.getStatus() != BookingStatus.PENDING) {
             throw new BadRequestException("Payment order can only be created for PENDING bookings. Current status: " + booking.getStatus());
         }
 
-        // 3. Enforce host approval gate
         if (!Boolean.TRUE.equals(booking.getHostApproved())) {
             throw new BadRequestException("Cannot initialize payment: The host has not accepted this booking request yet.");
         }
 
-        // 4. Late-binding overlap check: ensure dates haven't been confirmed by another reservation
         boolean hasConfirmedOverlap = bookingRepository.existsOverlappingBooking(
                 booking.getListing().getId(),
                 BookingStatus.CONFIRMED,
@@ -85,7 +85,6 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BookingConflictException("Cannot proceed with payment: The requested dates have already been confirmed by another guest.");
         }
 
-        // 5. Idempotency: reuse existing CREATED payment order if one was already issued
         Optional<Payment> existingPaymentOpt = paymentRepository.findByBookingId(booking.getId());
         if (existingPaymentOpt.isPresent()) {
             Payment existingPayment = existingPaymentOpt.get();
@@ -105,7 +104,6 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        // 6. Convert INR to paise for Razorpay API (e.g. 25000.00 -> 2500000)
         long amountInPaise = booking.getTotalPrice().multiply(BigDecimal.valueOf(100)).longValue();
 
         try {
@@ -140,6 +138,51 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (RazorpayException e) {
             log.error("Failed to create Razorpay order for booking ID {}: {}", booking.getId(), e.getMessage(), e);
             throw new BadRequestException("Unable to initialize payment gateway order: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void processWebhookEvent(String rawPayload, String signatureHeader) {
+        if (signatureHeader == null || signatureHeader.isBlank()) {
+            throw new UnauthorizedException("Missing Razorpay signature header");
+        }
+
+        boolean isValidSignature;
+        try {
+            isValidSignature = Utils.verifyWebhookSignature(rawPayload, signatureHeader, razorpayWebhookSecret);
+        } catch (RazorpayException e) {
+            log.error("Error during Razorpay webhook signature calculation: {}", e.getMessage());
+            throw new UnauthorizedException("Invalid webhook signature computation");
+        }
+
+        if (!isValidSignature) {
+            log.warn("Webhook signature mismatch detected. Rejecting payload.");
+            throw new UnauthorizedException("Invalid webhook signature");
+        }
+
+        JSONObject eventJson = new JSONObject(rawPayload);
+        String eventType = eventJson.optString("event");
+        log.info("Received verified Razorpay webhook event: {}", eventType);
+
+        if ("payment.captured".equals(eventType) || "order.paid".equals(eventType)) {
+            JSONObject payloadObj = eventJson.getJSONObject("payload");
+            JSONObject paymentObj = payloadObj.getJSONObject("payment").getJSONObject("entity");
+
+            String razorpayOrderId = paymentObj.optString("order_id");
+            String razorpayPaymentId = paymentObj.optString("id");
+
+            Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Payment record not found for Razorpay Order ID: " + razorpayOrderId));
+
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            payment.setRazorpaySignature(signatureHeader);
+            payment.setStatus(PaymentStatus.PAID);
+
+            paymentRepository.save(payment);
+            log.info("Payment ID {} successfully updated to status PAID for Order ID {}", payment.getId(), razorpayOrderId);
+        } else {
+            log.debug("Ignoring non-settlement Razorpay event: {}", eventType);
         }
     }
 }

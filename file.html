@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Harbored Razorpay Test Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 40px; text-align: center;">
+  <h2>Harbored Test Payment</h2>
+  <p>Click below to open the official Razorpay test checkout window.</p>
+  <button id="pay-btn" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background: #0c2340; color: white; border: none; border-radius: 6px;">
+    Pay Test Order
+  </button>
+
+  <script>
+    document.getElementById('pay-btn').onclick = function () {
+      var options = {
+        "key": "rzp_test_TrfCdiEtQmnpgW", // e.g. rzp_test_xxxxx
+        "amount": "2583333",            // Amount in paise from your create-order response
+        "currency": "INR",
+        "name": "Harbored Stays",
+        "description": "Test Booking Payment",
+        "order_id": "order_TrqNOqrzSNd4bq",    // Paste the order_id returned by POST /api/v1/payments/create-order
+        "handler": function (response) {
+          alert("Payment Successful!\nPayment ID: " + response.razorpay_payment_id);
+        },
+        "theme": { "color": "#0c2340" }
+      };
+      var rzp = new Razorpay(options);
+      rzp.open();
+    };
+  </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 package com.rohan.harbored.service.impl;
 
+import com.rohan.harbored.dto.request.CancelBookingRequestDto;
 import com.rohan.harbored.dto.request.CreateBookingDto;
 import com.rohan.harbored.dto.request.RejectBookingRequestDto;
 import com.rohan.harbored.dto.response.BookingResponseDto;
@@ -216,6 +217,86 @@ public class BookingServiceImpl implements BookingService {
                 request != null ? request.getReason() : "None provided");
 
         return bookingMapper.toResponseDto(cancelledBooking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto completeBooking(Long bookingId, String callerEmail) {
+        User caller = getUserByEmail(callerEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + bookingId));
+
+        boolean isGuest = booking.getGuest().getId().equals(caller.getId());
+        boolean isOwner = booking.getListing().getOwner().getId().equals(caller.getId());
+        boolean isAdmin = caller.getRole() == Role.ADMIN;
+
+        if (!isGuest && !isOwner && !isAdmin) {
+            throw new UnauthorizedException("You are not authorized to mark this booking as COMPLETED");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Only CONFIRMED bookings can be marked as COMPLETED. Current status: " + booking.getStatus());
+        }
+
+        if (booking.getEndDate().isAfter(LocalDate.now())) {
+            throw new BadRequestException("Cannot complete booking: Stay end date (" + booking.getEndDate() + ") has not passed yet.");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        Booking completedBooking = bookingRepository.save(booking);
+        log.info("Booking ID {} successfully transitioned to COMPLETED by {}", bookingId, caller.getEmail());
+
+        return bookingMapper.toResponseDto(completedBooking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto cancelBooking(Long bookingId, String callerEmail, CancelBookingRequestDto request) {
+        User caller = getUserByEmail(callerEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with ID: " + bookingId));
+
+        boolean isGuest = booking.getGuest().getId().equals(caller.getId());
+        boolean isOwner = booking.getListing().getOwner().getId().equals(caller.getId());
+        boolean isAdmin = caller.getRole() == Role.ADMIN;
+
+        if (!isGuest && !isOwner && !isAdmin) {
+            throw new UnauthorizedException("You are not authorized to cancel this booking");
+        }
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new BadRequestException("Completed bookings cannot be cancelled.");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BadRequestException("Booking is already CANCELLED.");
+        }
+
+        BookingStatus previousStatus = booking.getStatus();
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setHostApproved(false);
+
+        Booking cancelledBooking = bookingRepository.save(booking);
+
+        log.info("Booking ID {} cancelled by {}. Previous status: {}. Reason: {}",
+                bookingId, caller.getEmail(), previousStatus, request.getReason());
+
+        return bookingMapper.toResponseDto(cancelledBooking);
+    }
+
+    @Override
+    @Transactional
+    public int markExpiredBookingsAsCompleted() {
+        LocalDate today = LocalDate.now();
+        List<Booking> expiredBookings = bookingRepository.findByStatusAndEndDateBefore(BookingStatus.CONFIRMED, today);
+
+        for (Booking booking : expiredBookings) {
+            booking.setStatus(BookingStatus.COMPLETED);
+        }
+
+        bookingRepository.saveAll(expiredBookings);
+        log.info("Automated scheduler marked {} expired bookings as COMPLETED", expiredBookings.size());
+        return expiredBookings.size();
     }
 
     private User getUserByEmail(String email) {

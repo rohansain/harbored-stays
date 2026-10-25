@@ -175,12 +175,27 @@ public class PaymentServiceImpl implements PaymentService {
             Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId)
                     .orElseThrow(() -> new ResourceNotFoundException("Payment record not found for Razorpay Order ID: " + razorpayOrderId));
 
+            Booking booking = payment.getBooking();
+
+            // Idempotency check: if already processed, log and return early without mutating state
+            if (payment.getStatus() == PaymentStatus.PAID && booking.getStatus() == BookingStatus.CONFIRMED) {
+                log.info("Webhook already processed for Order ID: {} and Booking ID: {}. Acknowledging idempotently.",
+                        razorpayOrderId, booking.getId());
+                return;
+            }
+
+            // Transition payment state
             payment.setRazorpayPaymentId(razorpayPaymentId);
             payment.setRazorpaySignature(signatureHeader);
             payment.setStatus(PaymentStatus.PAID);
-
             paymentRepository.save(payment);
-            log.info("Payment ID {} successfully updated to status PAID for Order ID {}", payment.getId(), razorpayOrderId);
+
+            // Transition booking state to officially lock calendar dates
+            booking.setStatus(BookingStatus.CONFIRMED);
+            bookingRepository.save(booking);
+
+            log.info("Order ID {} successfully captured. Payment ID {} updated to PAID, Booking ID {} updated to CONFIRMED.",
+                    razorpayOrderId, payment.getId(), booking.getId());
         } else {
             log.debug("Ignoring non-settlement Razorpay event: {}", eventType);
         }

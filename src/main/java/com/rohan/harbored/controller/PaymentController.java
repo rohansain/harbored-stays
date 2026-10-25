@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,5 +32,14 @@ public class PaymentController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Razorpay payment order created successfully"));
+    }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<ApiResponse<Void>> handleRazorpayWebhook(
+            @RequestBody String rawPayload,
+            @RequestHeader(value = "X-Razorpay-Signature", required = false) String signatureHeader
+    ) {
+        paymentService.processWebhookEvent(rawPayload, signatureHeader);
+        return ResponseEntity.ok(ApiResponse.success(null, "Webhook processed successfully"));
     }
 }

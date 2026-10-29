@@ -27,7 +27,15 @@ public final class ListingSpecification {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            // 1. Dynamic City Filter: Case-insensitive match
+            // 1. Dynamic Keyword Filter: Matches against title OR description
+            if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
+                String searchPattern = "%" + filter.getKeyword().trim().toLowerCase() + "%";
+                Predicate titleMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), searchPattern);
+                Predicate descMatch = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), searchPattern);
+                predicates.add(criteriaBuilder.or(titleMatch, descMatch));
+            }
+
+            // 2. Dynamic City Filter: Case-insensitive match
             if (filter.getCity() != null && !filter.getCity().trim().isEmpty()) {
                 predicates.add(criteriaBuilder.equal(
                         criteriaBuilder.lower(root.get("city")),
@@ -35,7 +43,7 @@ public final class ListingSpecification {
                 ));
             }
 
-            // 2. Dynamic Minimum Price Filter: pricePerMonth >= minPrice
+            // 3. Dynamic Minimum Price Filter: pricePerMonth >= minPrice
             if (filter.getMinPrice() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(
                         root.get("pricePerMonth"),
@@ -43,7 +51,7 @@ public final class ListingSpecification {
                 ));
             }
 
-            // 3. Dynamic Maximum Price Filter: pricePerMonth <= maxPrice
+            // 4. Dynamic Maximum Price Filter: pricePerMonth <= maxPrice
             if (filter.getMaxPrice() != null) {
                 predicates.add(criteriaBuilder.lessThanOrEqualTo(
                         root.get("pricePerMonth"),
@@ -51,12 +59,11 @@ public final class ListingSpecification {
                 ));
             }
 
-            // 4. Date-Range Availability: Exclude listings with overlapping CONFIRMED bookings
+            // 5. Date-Range Availability: Exclude listings with overlapping CONFIRMED bookings
             LocalDate requestedStart = filter.getStartDate();
             LocalDate requestedEnd = filter.getEndDate();
 
             if (requestedStart != null && requestedEnd != null) {
-                // Subquery to find any conflicting CONFIRMED booking for this listing
                 Subquery<Long> bookingSubquery = query.subquery(Long.class);
                 Root<Booking> bookingRoot = bookingSubquery.from(Booking.class);
 
@@ -73,7 +80,6 @@ public final class ListingSpecification {
                                 endAfterRequestedStart
                         ));
 
-                // NOT EXISTS (conflicting booking)
                 predicates.add(criteriaBuilder.not(criteriaBuilder.exists(bookingSubquery)));
             }
 

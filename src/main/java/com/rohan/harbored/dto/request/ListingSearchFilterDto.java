@@ -18,6 +18,8 @@ import java.time.LocalDate;
 @Builder
 public class ListingSearchFilterDto {
 
+    private String keyword;
+    
     private String city;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "Minimum price cannot be negative")

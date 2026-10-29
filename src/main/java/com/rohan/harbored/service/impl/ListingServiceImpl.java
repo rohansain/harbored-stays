@@ -1,6 +1,7 @@
 package com.rohan.harbored.service.impl;
 
 import com.rohan.harbored.dto.request.CreateListingDto;
+import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.request.UpdateListingDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
 import com.rohan.harbored.entity.Listing;
@@ -15,7 +16,9 @@ import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.UserRepository;
 import com.rohan.harbored.service.DocumentStorageService;
 import com.rohan.harbored.service.ListingService;
+import com.rohan.harbored.specification.ListingSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -63,6 +66,23 @@ public class ListingServiceImpl implements ListingService {
     @Transactional(readOnly = true)
     public List<ListingResponseDto> getAllListings() {
         return listingRepository.findAll().stream()
+                .map(listingMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ListingResponseDto> searchListings(ListingSearchFilterDto filter) {
+        if (filter != null && filter.getMinPrice() != null && filter.getMaxPrice() != null) {
+            if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
+                throw new BadRequestException("minPrice cannot be greater than maxPrice");
+            }
+        }
+
+        Specification<Listing> spec = ListingSpecification.buildSearchSpecification(filter);
+        List<Listing> listings = listingRepository.findAll(spec);
+
+        return listings.stream()
                 .map(listingMapper::toResponseDto)
                 .collect(Collectors.toList());
     }

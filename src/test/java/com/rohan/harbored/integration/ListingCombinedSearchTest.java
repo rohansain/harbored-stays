@@ -1,7 +1,9 @@
+
 package com.rohan.harbored.integration;
 
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
+import com.rohan.harbored.dto.response.PagedResponseDto;
 import com.rohan.harbored.entity.Booking;
 import com.rohan.harbored.entity.Listing;
 import com.rohan.harbored.entity.User;
@@ -18,11 +20,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,7 +46,6 @@ class ListingCombinedSearchTest {
     private UserRepository userRepository;
 
     private Listing cyberHubStudio;
-    private Listing whitefieldFlat;
     private Listing noidaApartment;
 
     @BeforeEach
@@ -62,6 +63,7 @@ class ListingCombinedSearchTest {
                 .role(Role.HOST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
+
         userRepository.save(host);
 
         User guest = User.builder()
@@ -71,9 +73,9 @@ class ListingCombinedSearchTest {
                 .role(Role.GUEST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
+
         userRepository.save(guest);
 
-        // Listing 1: Gurugram, ₹22,000, mentions "Cyber City" in title, has Wi-Fi in description
         cyberHubStudio = Listing.builder()
                 .title("Furnished Studio near Cyber City")
                 .description("Includes high-speed Wi-Fi and power backup.")
@@ -84,10 +86,10 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
+
         listingRepository.save(cyberHubStudio);
 
-        // Listing 2: Bengaluru, ₹28,000, mentions "IT Park" in description
-        whitefieldFlat = Listing.builder()
+        Listing whitefieldFlat = Listing.builder()
                 .title("Modern 1BHK in Whitefield")
                 .description("Walking distance to IT Park, includes modern kitchen.")
                 .location("EPIP Zone")
@@ -97,9 +99,9 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
+
         listingRepository.save(whitefieldFlat);
 
-        // Listing 3: Noida, ₹18,000, mentions "Wi-Fi", booked in December 2026
         noidaApartment = Listing.builder()
                 .title("Cozy Flat in Sector 62")
                 .description("Dedicated study desk with fast Wi-Fi.")
@@ -110,9 +112,9 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
+
         listingRepository.save(noidaApartment);
 
-        // Seed confirmed booking on Listing 3 (Noida) for December 2026
         Booking confirmedBooking = Booking.builder()
                 .listing(noidaApartment)
                 .guest(guest)
@@ -122,6 +124,7 @@ class ListingCombinedSearchTest {
                 .status(BookingStatus.CONFIRMED)
                 .hostApproved(true)
                 .build();
+
         bookingRepository.save(confirmedBooking);
     }
 
@@ -132,10 +135,12 @@ class ListingCombinedSearchTest {
                 .keyword("Cyber")
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> results =
+                listingService.searchListings(filter, PageRequest.of(0, 10));
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getTitle()).contains("Cyber City");
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).getTitle())
+                .contains("Cyber City");
     }
 
     @Test
@@ -145,17 +150,17 @@ class ListingCombinedSearchTest {
                 .keyword("IT Park")
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> results =
+                listingService.searchListings(filter, PageRequest.of(0, 10));
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getTitle()).isEqualTo("Modern 1BHK in Whitefield");
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).getTitle())
+                .isEqualTo("Modern 1BHK in Whitefield");
     }
 
     @Test
-    @DisplayName("Combined search: Keyword + City + Price + Date availability")
+    @DisplayName("Combined search excludes booked or over-budget listings")
     void shouldExecuteCombinedSearchSuccessfully() {
-        // Search for "Wi-Fi", maxPrice: ₹20000, in December 2026
-        // Listing 3 matches "Wi-Fi" and price <= 20000, BUT is booked in December!
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .keyword("Wi-Fi")
                 .maxPrice(new BigDecimal("20000.00"))
@@ -163,14 +168,14 @@ class ListingCombinedSearchTest {
                 .endDate(LocalDate.of(2026, 12, 25))
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> results =
+                listingService.searchListings(filter, PageRequest.of(0, 10));
 
-        // Listing 3 was excluded due to the overlapping booking, Listing 1 excluded due to price (₹22,000 > ₹20,000)
-        assertThat(results).isEmpty();
+        assertThat(results.getContent()).isEmpty();
     }
 
     @Test
-    @DisplayName("Combined search matches listing when all criteria and dates align")
+    @DisplayName("Combined search returns listing when all criteria match")
     void shouldMatchWhenAllCombinedCriteriaAlign() {
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .keyword("Wi-Fi")
@@ -181,10 +186,13 @@ class ListingCombinedSearchTest {
                 .endDate(LocalDate.of(2026, 11, 30))
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> results =
+                listingService.searchListings(filter, PageRequest.of(0, 10));
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getId()).isEqualTo(cyberHubStudio.getId());
-        assertThat(results.get(0).getCity()).isEqualTo("Gurugram");
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).getId())
+                .isEqualTo(cyberHubStudio.getId());
+        assertThat(results.getContent().get(0).getCity())
+                .isEqualTo("Gurugram");
     }
 }

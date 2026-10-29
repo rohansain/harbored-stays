@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -73,9 +74,29 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponseDto> searchListings(ListingSearchFilterDto filter) {
-        if (filter != null && filter.getMinPrice() != null && filter.getMaxPrice() != null) {
-            if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
-                throw new BadRequestException("minPrice cannot be greater than maxPrice");
+        if (filter != null) {
+            // Price range check
+            if (filter.getMinPrice() != null && filter.getMaxPrice() != null) {
+                if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
+                    throw new BadRequestException("minPrice cannot be greater than maxPrice");
+                }
+            }
+
+            // Date validation rules
+            LocalDate start = filter.getStartDate();
+            LocalDate end = filter.getEndDate();
+
+            if ((start != null && end == null) || (start == null && end != null)) {
+                throw new BadRequestException("Both startDate and endDate must be provided together for date-range filtering");
+            }
+
+            if (start != null && end != null) {
+                if (!start.isBefore(end)) {
+                    throw new BadRequestException("startDate must be strictly before endDate");
+                }
+                if (start.isBefore(LocalDate.now())) {
+                    throw new BadRequestException("startDate cannot be in the past");
+                }
             }
         }
 

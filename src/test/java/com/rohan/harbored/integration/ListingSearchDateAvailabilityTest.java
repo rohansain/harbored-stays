@@ -2,6 +2,7 @@ package com.rohan.harbored.integration;
 
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
+import com.rohan.harbored.dto.response.PagedResponseDto;
 import com.rohan.harbored.entity.Booking;
 import com.rohan.harbored.entity.Listing;
 import com.rohan.harbored.entity.User;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -121,7 +123,8 @@ class ListingSearchDateAvailabilityTest {
                 .endDate(LocalDate.of(2026, 11, 25))
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> response = listingService.searchListings(filter, Pageable.unpaged());
+        List<ListingResponseDto> results = response.getContent();
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getId()).isEqualTo(availableListing.getId());
@@ -137,7 +140,8 @@ class ListingSearchDateAvailabilityTest {
                 .endDate(LocalDate.of(2027, 1, 5))
                 .build();
 
-        List<ListingResponseDto> results = listingService.searchListings(filter);
+        PagedResponseDto<ListingResponseDto> response = listingService.searchListings(filter, Pageable.unpaged());
+        List<ListingResponseDto> results = response.getContent();
 
         assertThat(results).hasSize(2);
     }
@@ -149,7 +153,7 @@ class ListingSearchDateAvailabilityTest {
                 .startDate(LocalDate.of(2026, 11, 1))
                 .build();
 
-        assertThatThrownBy(() -> listingService.searchListings(invalidFilter))
+        assertThatThrownBy(() -> listingService.searchListings(invalidFilter, Pageable.unpaged()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Both startDate and endDate must be provided together");
     }

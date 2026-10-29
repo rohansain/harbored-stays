@@ -4,6 +4,7 @@ import com.rohan.harbored.dto.request.CreateListingDto;
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.request.UpdateListingDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
+import com.rohan.harbored.dto.response.PagedResponseDto;
 import com.rohan.harbored.entity.Listing;
 import com.rohan.harbored.entity.User;
 import com.rohan.harbored.entity.enums.Role;
@@ -18,10 +19,12 @@ import com.rohan.harbored.service.DocumentStorageService;
 import com.rohan.harbored.service.ListingService;
 import com.rohan.harbored.specification.ListingSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -71,18 +74,17 @@ public class ListingServiceImpl implements ListingService {
                 .collect(Collectors.toList());
     }
 
+
     @Override
     @Transactional(readOnly = true)
-    public List<ListingResponseDto> searchListings(ListingSearchFilterDto filter) {
+    public PagedResponseDto<ListingResponseDto> searchListings(ListingSearchFilterDto filter, Pageable pageable) {
         if (filter != null) {
-            // Price range check
             if (filter.getMinPrice() != null && filter.getMaxPrice() != null) {
                 if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
                     throw new BadRequestException("minPrice cannot be greater than maxPrice");
                 }
             }
 
-            // Date validation rules
             LocalDate start = filter.getStartDate();
             LocalDate end = filter.getEndDate();
 
@@ -101,52 +103,34 @@ public class ListingServiceImpl implements ListingService {
         }
 
         Specification<Listing> spec = ListingSpecification.buildSearchSpecification(filter);
-        List<Listing> listings = listingRepository.findAll(spec);
+        Page<Listing> listingPage = listingRepository.findAll(spec, pageable);
 
-        return listings.stream()
-                .map(listingMapper::toResponseDto)
-                .collect(Collectors.toList());
+        Page<ListingResponseDto> dtoPage = listingPage.map(listingMapper::toResponseDto);
+        return PagedResponseDto.of(dtoPage);
     }
 
     @Override
     @Transactional
-    public ListingResponseDto updateListing(Long listingId, String userEmail, UpdateListingDto request) {
-        User currentUser = getUserByEmail(userEmail);
-        Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Listing not found with id: " + listingId));
+    public ListingResponseDto updateListing(Long id, String ownerEmail, CreateListingDto request) {
+        Listing listing = listingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Listing not found with ID: " + id));
 
-        validateOwnershipOrAdmin(listing, currentUser);
+        User caller = getUserByEmail(ownerEmail);
+        validateOwnership(listing, caller);
 
-        if (request.getTitle() != null && !request.getTitle().isBlank()) {
-            listing.setTitle(request.getTitle().trim());
-        }
-        if (request.getDescription() != null && !request.getDescription().isBlank()) {
-            listing.setDescription(request.getDescription().trim());
-        }
-        if (request.getLocation() != null && !request.getLocation().isBlank()) {
-            listing.setLocation(request.getLocation().trim());
-        }
-        if (request.getCity() != null && !request.getCity().isBlank()) {
-            listing.setCity(request.getCity().trim());
-        }
-        if (request.getPricePerMonth() != null) {
-            listing.setPricePerMonth(request.getPricePerMonth());
-        }
-        if (request.getMinStayMonths() != null) {
-            listing.setMinStayMonths(request.getMinStayMonths());
-        }
-        if (request.getMaxStayMonths() != null) {
-            listing.setMaxStayMonths(request.getMaxStayMonths());
-        }
-        if (listing.getMinStayMonths() > listing.getMaxStayMonths()) {
+        if (request.getMinStayMonths() > request.getMaxStayMonths()) {
             throw new BadRequestException("Minimum stay months cannot exceed maximum stay months");
         }
-        if (request.getImages() != null) {
-            listing.setImages(new ArrayList<>(request.getImages()));
-        }
 
-        Listing updatedListing = listingRepository.save(listing);
-        return listingMapper.toResponseDto(updatedListing);
+        listing.setTitle(request.getTitle().trim());
+        listing.setDescription(request.getDescription().trim());
+        listing.setLocation(request.getLocation().trim());
+        listing.setCity(request.getCity().trim());
+        listing.setPricePerMonth(request.getPricePerMonth());
+        listing.setMinStayMonths(request.getMinStayMonths());
+        listing.setMaxStayMonths(request.getMaxStayMonths());
+        Listing updated = listingRepository.save(listing);
+        return listingMapper.toResponseDto(updated);
     }
 
     @Override
@@ -192,6 +176,14 @@ public class ListingServiceImpl implements ListingService {
         boolean isOwner = listing.getOwner().getId().equals(currentUser.getId());
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
 
+        if (!isOwner && !isAdmin) {
+            throw new UnauthorizedException("You do not have permission to modify or delete this listing");
+        }
+    }
+
+    private void validateOwnership(Listing listing, User caller) {
+        boolean isOwner = listing.getOwner().getId().equals(caller.getId());
+        boolean isAdmin = caller.getRole() == Role.ADMIN;
         if (!isOwner && !isAdmin) {
             throw new UnauthorizedException("You do not have permission to modify or delete this listing");
         }

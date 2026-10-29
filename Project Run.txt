@@ -1,0 +1,9 @@
+#How to start ngrock
+#docker run --rm -it -e NGROK_AUTHTOKEN=3L9NG1M0dDMJyeSBmkfd34m2J58_5K6Vso9eiF6gYzN8A3QpU ngrok/ngrok:latest http host.docker.internal:8080
+
+
+
+
+//Good approch
+dynamic filtering
+I learned to implement dynamic filtering using Spring Data JPA Specifications in my Harbored project. Instead of creating multiple repository methods for every combination of optional search filters, I can build query conditions dynamically based on the filters provided by the user. This makes the code more reusable, maintainable, and scalable.

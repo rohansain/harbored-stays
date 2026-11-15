@@ -49,6 +49,8 @@ class ListingSearchDateAvailabilityTest {
 
     private Listing availableListing;
     private Listing bookedListing;
+    private LocalDate bookedStart;
+    private LocalDate bookedEnd;
 
     @BeforeEach
     void setUp() {
@@ -89,7 +91,7 @@ class ListingSearchDateAvailabilityTest {
                 .build();
         listingRepository.save(availableListing);
 
-        // Listing 2: Has a CONFIRMED booking from Nov 1 to Dec 1, 2026
+        // Listing 2: Has a CONFIRMED booking from +10 days to +40 days from today
         bookedListing = Listing.builder()
                 .title("Quiet Room in HSR Layout")
                 .description("Near tech offices.")
@@ -102,11 +104,14 @@ class ListingSearchDateAvailabilityTest {
                 .build();
         listingRepository.save(bookedListing);
 
+        bookedStart = LocalDate.now().plusDays(10);
+        bookedEnd = LocalDate.now().plusDays(40);
+
         Booking confirmedBooking = Booking.builder()
                 .listing(bookedListing)
                 .guest(guest)
-                .startDate(LocalDate.of(2026, 11, 1))
-                .endDate(LocalDate.of(2026, 12, 1))
+                .startDate(bookedStart)
+                .endDate(bookedEnd)
                 .totalPrice(new BigDecimal("24000.00"))
                 .status(BookingStatus.CONFIRMED)
                 .hostApproved(true)
@@ -119,8 +124,8 @@ class ListingSearchDateAvailabilityTest {
     void shouldExcludeOverlappingBookedListing() {
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .city("Bengaluru")
-                .startDate(LocalDate.of(2026, 11, 10))
-                .endDate(LocalDate.of(2026, 11, 25))
+                .startDate(bookedStart.plusDays(5))
+                .endDate(bookedEnd.minusDays(5))
                 .build();
 
         PagedResponseDto<ListingResponseDto> response = listingService.searchListings(filter, Pageable.unpaged());
@@ -136,8 +141,8 @@ class ListingSearchDateAvailabilityTest {
     void shouldIncludeListingWhenDatesDoNotOverlap() {
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .city("Bengaluru")
-                .startDate(LocalDate.of(2026, 12, 5))
-                .endDate(LocalDate.of(2027, 1, 5))
+                .startDate(bookedEnd.plusDays(5))
+                .endDate(bookedEnd.plusDays(35))
                 .build();
 
         PagedResponseDto<ListingResponseDto> response = listingService.searchListings(filter, Pageable.unpaged());
@@ -150,7 +155,7 @@ class ListingSearchDateAvailabilityTest {
     @DisplayName("Should reject search when only one date boundary is provided")
     void shouldRejectPartialDateSearch() {
         ListingSearchFilterDto invalidFilter = ListingSearchFilterDto.builder()
-                .startDate(LocalDate.of(2026, 11, 1))
+                .startDate(LocalDate.now().plusDays(10))
                 .build();
 
         assertThatThrownBy(() -> listingService.searchListings(invalidFilter, Pageable.unpaged()))

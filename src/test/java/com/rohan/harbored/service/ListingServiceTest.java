@@ -41,6 +41,9 @@ class ListingServiceTest {
     @Mock
     private ListingMapper listingMapper;
 
+    @Mock
+    private DocumentStorageService documentStorageService;
+
     @InjectMocks
     private ListingServiceImpl listingService;
 

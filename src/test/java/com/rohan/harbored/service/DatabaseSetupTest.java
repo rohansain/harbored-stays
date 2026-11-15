@@ -6,13 +6,14 @@ import com.rohan.harbored.entity.enums.VerificationStatus;
 import com.rohan.harbored.repository.BookingRepository;
 import com.rohan.harbored.repository.ListingRepository;
 import com.rohan.harbored.repository.UserRepository;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@Disabled("Manual dev database seeding utility — disabled during automated mvn test runs")
 class DatabaseSetupTest {
 
     @Autowired
@@ -29,8 +30,6 @@ class DatabaseSetupTest {
 
     @Test
     void cleanDatabaseAndCreateUsers() {
-
-        // Delete existing users
         bookingRepository.deleteAll();
         listingRepository.deleteAll();
         userRepository.deleteAll();

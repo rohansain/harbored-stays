@@ -1,4 +1,3 @@
-
 package com.rohan.harbored.integration;
 
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
@@ -63,7 +62,6 @@ class ListingCombinedSearchTest {
                 .role(Role.HOST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
-
         userRepository.save(host);
 
         User guest = User.builder()
@@ -73,7 +71,6 @@ class ListingCombinedSearchTest {
                 .role(Role.GUEST)
                 .verificationStatus(VerificationStatus.VERIFIED)
                 .build();
-
         userRepository.save(guest);
 
         cyberHubStudio = Listing.builder()
@@ -86,7 +83,6 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
-
         listingRepository.save(cyberHubStudio);
 
         Listing whitefieldFlat = Listing.builder()
@@ -99,7 +95,6 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
-
         listingRepository.save(whitefieldFlat);
 
         noidaApartment = Listing.builder()
@@ -112,19 +107,18 @@ class ListingCombinedSearchTest {
                 .maxStayMonths(6)
                 .owner(host)
                 .build();
-
         listingRepository.save(noidaApartment);
 
+        // Seed a CONFIRMED booking starting 30 days from now to 60 days from now on Noida apartment
         Booking confirmedBooking = Booking.builder()
                 .listing(noidaApartment)
                 .guest(guest)
-                .startDate(LocalDate.of(2026, 12, 1))
-                .endDate(LocalDate.of(2026, 12, 31))
+                .startDate(LocalDate.now().plusDays(30))
+                .endDate(LocalDate.now().plusDays(60))
                 .totalPrice(new BigDecimal("18000.00"))
                 .status(BookingStatus.CONFIRMED)
                 .hostApproved(true)
                 .build();
-
         bookingRepository.save(confirmedBooking);
     }
 
@@ -139,8 +133,7 @@ class ListingCombinedSearchTest {
                 listingService.searchListings(filter, PageRequest.of(0, 10));
 
         assertThat(results.getContent()).hasSize(1);
-        assertThat(results.getContent().get(0).getTitle())
-                .contains("Cyber City");
+        assertThat(results.getContent().get(0).getTitle()).contains("Cyber City");
     }
 
     @Test
@@ -154,45 +147,46 @@ class ListingCombinedSearchTest {
                 listingService.searchListings(filter, PageRequest.of(0, 10));
 
         assertThat(results.getContent()).hasSize(1);
-        assertThat(results.getContent().get(0).getTitle())
-                .isEqualTo("Modern 1BHK in Whitefield");
+        assertThat(results.getContent().get(0).getTitle()).isEqualTo("Modern 1BHK in Whitefield");
     }
 
     @Test
     @DisplayName("Combined search excludes booked or over-budget listings")
     void shouldExecuteCombinedSearchSuccessfully() {
+        // Query overlapping the booked window for noidaApartment (days 35 to 55 from now)
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .keyword("Wi-Fi")
                 .maxPrice(new BigDecimal("20000.00"))
-                .startDate(LocalDate.of(2026, 12, 5))
-                .endDate(LocalDate.of(2026, 12, 25))
+                .startDate(LocalDate.now().plusDays(35))
+                .endDate(LocalDate.now().plusDays(55))
                 .build();
 
         PagedResponseDto<ListingResponseDto> results =
                 listingService.searchListings(filter, PageRequest.of(0, 10));
 
+        // Noida flat matches Wi-Fi & price <= 20000, but is booked during this window -> excluded!
+        // Cyber studio has Wi-Fi, but price (22000) > maxPrice (20000) -> excluded!
         assertThat(results.getContent()).isEmpty();
     }
 
     @Test
     @DisplayName("Combined search returns listing when all criteria match")
     void shouldMatchWhenAllCombinedCriteriaAlign() {
+        // Query window starting tomorrow (always valid, never in the past)
         ListingSearchFilterDto filter = ListingSearchFilterDto.builder()
                 .keyword("Wi-Fi")
                 .city("Gurugram")
                 .minPrice(new BigDecimal("20000.00"))
                 .maxPrice(new BigDecimal("25000.00"))
-                .startDate(LocalDate.of(2026, 11, 1))
-                .endDate(LocalDate.of(2026, 11, 30))
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(30))
                 .build();
 
         PagedResponseDto<ListingResponseDto> results =
                 listingService.searchListings(filter, PageRequest.of(0, 10));
 
         assertThat(results.getContent()).hasSize(1);
-        assertThat(results.getContent().get(0).getId())
-                .isEqualTo(cyberHubStudio.getId());
-        assertThat(results.getContent().get(0).getCity())
-                .isEqualTo("Gurugram");
+        assertThat(results.getContent().get(0).getId()).isEqualTo(cyberHubStudio.getId());
+        assertThat(results.getContent().get(0).getCity()).isEqualTo("Gurugram");
     }
 }

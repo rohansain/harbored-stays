@@ -2,7 +2,6 @@ package com.rohan.harbored.service.impl;
 
 import com.rohan.harbored.dto.request.CreateListingDto;
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
-import com.rohan.harbored.dto.request.UpdateListingDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
 import com.rohan.harbored.dto.response.PagedResponseDto;
 import com.rohan.harbored.entity.Listing;

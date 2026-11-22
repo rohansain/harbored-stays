@@ -7,6 +7,7 @@ import com.rohan.harbored.entity.User;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 @Component
 public class ListingMapper {
@@ -44,7 +45,7 @@ public class ListingMapper {
                 .pricePerMonth(listing.getPricePerMonth())
                 .minStayMonths(listing.getMinStayMonths())
                 .maxStayMonths(listing.getMaxStayMonths())
-                .images(listing.getImages())
+                .images(listing.getImages() != null ? new ArrayList<>(listing.getImages()) : Collections.emptyList())
                 .averageRating(listing.getAverageRating())
                 .ownerId(listing.getOwner() != null ? listing.getOwner().getId() : null)
                 .ownerName(listing.getOwner() != null ? listing.getOwner().getName() : null)

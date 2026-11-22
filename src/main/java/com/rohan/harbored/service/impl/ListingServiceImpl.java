@@ -1,5 +1,6 @@
 package com.rohan.harbored.service.impl;
 
+import com.rohan.harbored.config.RedisConfig;
 import com.rohan.harbored.dto.request.CreateListingDto;
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
@@ -18,18 +19,21 @@ import com.rohan.harbored.service.DocumentStorageService;
 import com.rohan.harbored.service.ListingService;
 import com.rohan.harbored.specification.ListingSpecification;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ListingServiceImpl implements ListingService {
@@ -73,10 +77,16 @@ public class ListingServiceImpl implements ListingService {
                 .collect(Collectors.toList());
     }
 
-
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(
+            value = RedisConfig.SEARCH_RESULTS_CACHE,
+            keyGenerator = "searchCacheKeyGenerator"
+    )
     public PagedResponseDto<ListingResponseDto> searchListings(ListingSearchFilterDto filter, Pageable pageable) {
+        log.info("Cache MISS for listingSearchResults [filter={}, page={}] - querying database",
+                filter, pageable.getPageNumber());
+
         if (filter != null) {
             if (filter.getMinPrice() != null && filter.getMaxPrice() != null) {
                 if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {

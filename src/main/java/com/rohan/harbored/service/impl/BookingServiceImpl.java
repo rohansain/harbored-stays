@@ -22,6 +22,7 @@ import com.rohan.harbored.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,8 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.rohan.harbored.config.RedisConfig;
 
 @Service
 @RequiredArgsConstructor
@@ -251,6 +254,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public BookingResponseDto cancelBooking(Long bookingId, String callerEmail, CancelBookingRequestDto request) {
         User caller = getUserByEmail(callerEmail);
         Booking booking = bookingRepository.findById(bookingId)

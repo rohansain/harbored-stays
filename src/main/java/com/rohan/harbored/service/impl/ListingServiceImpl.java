@@ -20,6 +20,7 @@ import com.rohan.harbored.service.ListingService;
 import com.rohan.harbored.specification.ListingSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +46,7 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public ListingResponseDto createListing(String userEmail, CreateListingDto request) {
         User user = getUserByEmail(userEmail);
 
@@ -58,6 +60,7 @@ public class ListingServiceImpl implements ListingService {
 
         Listing listing = listingMapper.toEntity(request, user);
         Listing savedListing = listingRepository.save(listing);
+        log.info("Evicted {} cache after creating listing ID: {}", RedisConfig.SEARCH_RESULTS_CACHE, savedListing.getId());
         return listingMapper.toResponseDto(savedListing);
     }
 
@@ -120,6 +123,7 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public ListingResponseDto updateListing(Long id, String ownerEmail, CreateListingDto request) {
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Listing not found with ID: " + id));
@@ -139,11 +143,13 @@ public class ListingServiceImpl implements ListingService {
         listing.setMinStayMonths(request.getMinStayMonths());
         listing.setMaxStayMonths(request.getMaxStayMonths());
         Listing updated = listingRepository.save(listing);
+        log.info("Evicted {} cache after updating listing ID: {}", RedisConfig.SEARCH_RESULTS_CACHE, id);
         return listingMapper.toResponseDto(updated);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public void deleteListing(Long listingId, String userEmail) {
         User currentUser = getUserByEmail(userEmail);
         Listing listing = listingRepository.findById(listingId)
@@ -152,10 +158,12 @@ public class ListingServiceImpl implements ListingService {
         validateOwnershipOrAdmin(listing, currentUser);
 
         listingRepository.delete(listing);
+        log.info("Evicted {} cache after deleting listing ID: {}", RedisConfig.SEARCH_RESULTS_CACHE, listingId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public ListingResponseDto uploadListingImages(Long listingId, String userEmail, List<MultipartFile> files) {
         User currentUser = getUserByEmail(userEmail);
         Listing listing = listingRepository.findById(listingId)
@@ -173,6 +181,7 @@ public class ListingServiceImpl implements ListingService {
         listing.setImages(existingImages);
 
         Listing savedListing = listingRepository.save(listing);
+        log.info("Evicted {} cache after uploading images for listing ID: {}", RedisConfig.SEARCH_RESULTS_CACHE, listingId);
         return listingMapper.toResponseDto(savedListing);
     }
 

@@ -4,6 +4,7 @@ import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
+import com.rohan.harbored.config.RedisConfig;
 import com.rohan.harbored.dto.request.CreatePaymentOrderRequestDto;
 import com.rohan.harbored.dto.response.PaymentOrderResponseDto;
 import com.rohan.harbored.entity.Booking;
@@ -25,6 +26,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -143,6 +145,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
+    @CacheEvict(value = RedisConfig.SEARCH_RESULTS_CACHE, allEntries = true)
     public void processWebhookEvent(String rawPayload, String signatureHeader) {
         if (signatureHeader == null || signatureHeader.isBlank()) {
             throw new UnauthorizedException("Missing Razorpay signature header");

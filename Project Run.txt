@@ -1,7 +1,10 @@
 #How to start ngrock
 #docker run --rm -it -e NGROK_AUTHTOKEN=3L9NG1M0dDMJyeSBmkfd34m2J58_5K6Vso9eiF6gYzN8A3QpU ngrok/ngrok:latest http host.docker.internal:8080
 
+#How to start Radis
+docker run -d \  --name harbored-redis \  -p 6379:6379 \  redis:7-alpine
 
+docker start harbored-redis
 
 
 //Good approch

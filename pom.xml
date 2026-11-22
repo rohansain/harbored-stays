@@ -131,6 +131,12 @@
 			<version>1.4.9</version>
 			<scope>compile</scope>
 		</dependency>
+
+		<!-- Spring Data Redis for Distributed Caching -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

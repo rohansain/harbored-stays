@@ -13,3 +13,11 @@ docker exec -it harbored-redis redis-cli FLUSHDB
 //Good approch
 dynamic filtering
 I learned to implement dynamic filtering using Spring Data JPA Specifications in my Harbored project. Instead of creating multiple repository methods for every combination of optional search filters, I can build query conditions dynamically based on the filters provided by the user. This makes the code more reusable, maintainable, and scalable.
+
+
+******How to see something in Redis**********
+Enter in REDIS CLI
+docker exec -it harbored-redis redis-cli
+
+
+List all keys (for small/dev databases) ->   KEYS *

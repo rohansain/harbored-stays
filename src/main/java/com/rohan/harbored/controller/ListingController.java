@@ -3,14 +3,17 @@ package com.rohan.harbored.controller;
 import com.rohan.harbored.dto.request.CreateListingDto;
 import com.rohan.harbored.dto.request.ListingSearchFilterDto;
 import com.rohan.harbored.dto.response.ApiResponse;
+import com.rohan.harbored.dto.response.ListingAvailabilityResponseDto;
 import com.rohan.harbored.dto.response.ListingResponseDto;
 import com.rohan.harbored.dto.response.PagedResponseDto;
+import com.rohan.harbored.service.ListingAvailabilityService;
 import com.rohan.harbored.service.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -37,6 +41,7 @@ import java.util.List;
 public class ListingController {
 
     private final ListingService listingService;
+    private final ListingAvailabilityService listingAvailabilityService;
 
     @PostMapping
     @PreAuthorize("hasRole('HOST') or hasRole('ADMIN')")
@@ -100,5 +105,15 @@ public class ListingController {
     ) {
         ListingResponseDto response = listingService.uploadListingImages(id, userDetails.getUsername(), files);
         return ResponseEntity.ok(ApiResponse.success(response, "Listing images uploaded successfully"));
+    }
+
+    @GetMapping("/{id}/availability")
+    public ResponseEntity<ApiResponse<ListingAvailabilityResponseDto>> checkAvailability(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        ListingAvailabilityResponseDto response = listingAvailabilityService.checkAvailability(id, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(response, "Listing availability checked successfully"));
     }
 }
